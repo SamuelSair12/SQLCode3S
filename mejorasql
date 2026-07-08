@@ -1,0 +1,155 @@
+DROP DATABASE IF EXISTS smart_grid;
+CREATE DATABASE smart_grid;
+USE smart_grid;
+
+-- ==========================================
+-- 1. TABLAS DE CATÁLOGO (Para cumplir 3FN)
+-- ==========================================
+
+CREATE TABLE Ciudad (
+    id_ciudad INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE Especialidad (
+    id_especialidad INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL UNIQUE
+);
+
+-- ==========================================
+-- 2. INFRAESTRUCTURA
+-- ==========================================
+
+CREATE TABLE Subestacion (
+    id_subestacion INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    id_ciudad INT,
+    direccion VARCHAR(255),
+    capacidad_maxima DECIMAL(10,2),
+    FOREIGN KEY (id_ciudad) REFERENCES Ciudad(id_ciudad)
+);
+
+CREATE TABLE Zona (
+    id_zona INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    id_subestacion INT,
+    FOREIGN KEY (id_subestacion) REFERENCES Subestacion(id_subestacion)
+);
+
+CREATE TABLE Barrio (
+    id_barrio INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    id_zona INT,
+    FOREIGN KEY (id_zona) REFERENCES Zona(id_zona)
+);
+
+CREATE TABLE Transformador (
+    id_transformador INT AUTO_INCREMENT PRIMARY KEY,
+    id_subestacion INT,
+    codigo_inventario VARCHAR(50) UNIQUE NOT NULL,
+    capacidad_kva DECIMAL(10,2),
+    estado_operativo ENUM('Activo', 'Inactivo', 'Reparacion') DEFAULT 'Activo',
+    FOREIGN KEY (id_subestacion) REFERENCES Subestacion(id_subestacion)
+);
+
+-- ==========================================
+-- 3. PERSONAL Y CUADRILLAS
+-- ==========================================
+
+CREATE TABLE Cuadrilla (
+    id_cuadrilla INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    estado ENUM('Disponible', 'Ocupada', 'Fuera de Servicio') DEFAULT 'Disponible'
+);
+
+CREATE TABLE Tecnico (
+    id_tecnico INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(150) NOT NULL,
+    id_especialidad INT,
+    id_cuadrilla INT, -- El técnico pertenece a una cuadrilla
+    telefono VARCHAR(20),
+    FOREIGN KEY (id_especialidad) REFERENCES Especialidad(id_especialidad),
+    FOREIGN KEY (id_cuadrilla) REFERENCES Cuadrilla(id_cuadrilla)
+);
+
+-- ==========================================
+-- 4. CLIENTES Y TARIFAS
+-- ==========================================
+
+CREATE TABLE Tarifa (
+    id_tarifa INT AUTO_INCREMENT PRIMARY KEY,
+    tipo_cliente ENUM('Residencial', 'Comercial', 'Industrial'),
+    costo_por_kwh DECIMAL(10,2),
+    fecha_inicio_vigencia DATE
+);
+
+CREATE TABLE Cliente (
+    id_cliente INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(150) NOT NULL,
+    documento VARCHAR(20) UNIQUE NOT NULL,
+    id_barrio INT,
+    direccion VARCHAR(255),
+    id_tarifa INT,
+    FOREIGN KEY (id_barrio) REFERENCES Barrio(id_barrio),
+    FOREIGN KEY (id_tarifa) REFERENCES Tarifa(id_tarifa)
+);
+
+CREATE TABLE Medidor (
+    id_medidor INT AUTO_INCREMENT PRIMARY KEY,
+    codigo_serial VARCHAR(100) UNIQUE NOT NULL,
+    id_cliente INT,
+    id_transformador INT,
+    estado ENUM('Activo', 'Suspendido', 'Retirado'),
+    FOREIGN KEY (id_cliente) REFERENCES Cliente(id_cliente),
+    FOREIGN KEY (id_transformador) REFERENCES Transformador(id_transformador)
+);
+
+-- ==========================================
+-- 5. OPERACIONES (Logs y Movimientos)
+-- ==========================================
+
+CREATE TABLE Mantenimiento (
+    id_mantenimiento INT AUTO_INCREMENT PRIMARY KEY,
+    id_transformador INT,
+    id_cuadrilla INT, -- Solo asignamos la cuadrilla (simplifica la lógica)
+    fecha_inicio DATETIME,
+    fecha_fin DATETIME,
+    tipo ENUM('Preventivo', 'Correctivo'),
+    descripcion TEXT,
+    FOREIGN KEY (id_transformador) REFERENCES Transformador(id_transformador),
+    FOREIGN KEY (id_cuadrilla) REFERENCES Cuadrilla(id_cuadrilla)
+);
+
+CREATE TABLE Consumo (
+    id_consumo BIGINT AUTO_INCREMENT PRIMARY KEY, -- BIGINT porque habrá millones de datos
+    id_medidor INT,
+    fecha_hora DATETIME,
+    valor_kwh DECIMAL(10,2),
+    voltaje DECIMAL(6,2),
+    FOREIGN KEY (id_medidor) REFERENCES Medidor(id_medidor)
+);
+
+-- ==========================================
+-- INSERCIÓN DE DATOS DE PRUEBA
+-- ==========================================
+
+INSERT INTO Ciudad (nombre) VALUES ('Sincelejo'), ('Montería');
+INSERT INTO Especialidad (nombre) VALUES ('Alta Tensión'), ('Medidores');
+
+INSERT INTO Subestacion (nombre, id_ciudad, direccion, capacidad_maxima) 
+VALUES ('Subestacion Central', 1, 'Calle 20 #25-40', 5000);
+
+INSERT INTO Zona (nombre, id_subestacion) VALUES ('Zona Centro', 1);
+INSERT INTO Barrio (nombre, id_zona) VALUES ('Majagual', 1);
+
+INSERT INTO Tarifa (tipo_cliente, costo_por_kwh, fecha_inicio_vigencia) 
+VALUES ('Residencial', 650.50, '2024-01-01');
+
+INSERT INTO Cliente (nombre, documento, id_barrio, direccion, id_tarifa)
+VALUES ('Carlos Mendoza', '11002233', 1, 'Calle 15 #12-20', 1);
+
+INSERT INTO Transformador (id_subestacion, codigo_inventario, capacidad_kva)
+VALUES (1, 'TR-01-CEN', 150);
+
+INSERT INTO Medidor (codigo_serial, id_cliente, id_transformador, estado)
+VALUES ('M-998811', 1, 1, 'Activo');
