@@ -1,3 +1,5 @@
+aviso: correccion hecha de manera independiente en base a AI, no fue realizada por el autor 
+
 DROP DATABASE IF EXISTS smart_grid;
 CREATE DATABASE smart_grid;
 USE smart_grid;
